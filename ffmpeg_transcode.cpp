@@ -10,6 +10,24 @@ AVPacket m_in_pkt;                                           //读取输入文�
 map<int,Out_stream_info*> m_list_out_stream_info ;           //多路输出的list
 static FILE * pcm_file = NULL;                               //测试存储pcm用
  
+void av_init_packet2(AVPacket *pkt)  
+{  
+    pkt->pts                  = AV_NOPTS_VALUE;  
+    pkt->dts                  = AV_NOPTS_VALUE;  
+    pkt->pos                  = -1;  
+    pkt->duration             = 0;  
+    pkt->convergence_duration = 0;  
+    pkt->flags                = 0;  
+    pkt->stream_index         = 0;  
+#if FF_API_DESTRUCT_PACKET  
+    pkt->destruct             = NULL;  
+#endif  
+    pkt->buf                  = NULL; // 数据域没有,　为空  
+    pkt->side_data            = NULL;  
+    pkt->side_data_elems      = 0;  
+}  
+
+
 int ffmpeg_init_demux(char * inurlname,AVFormatContext ** iframe_c)
 {  
 	int ret = 0;
@@ -623,7 +641,7 @@ int ffmpeg_perform_code2(Out_stream_info * out_stream_info,int stream_type,AVFra
 	int ret = 0;
 	AVCodecContext *cctext = NULL;  
 	AVPacket pkt_t;  
-	av_init_packet(&pkt_t);  
+	av_init_packet2(&pkt_t);  
 	pkt_t.data = NULL; // packet data will be allocated by the encoder  
 	pkt_t.size = 0;  
 	int frameFinished = 0 ;  
@@ -670,7 +688,7 @@ int ffmpeg_perform_code2(Out_stream_info * out_stream_info,int stream_type,AVFra
 			if (ret>=0 && frameFinished)  
 			{  
 				ffmpeg_write_frame2(out_stream_info,OUT_AUDIO_ID,pkt_t); 
-				av_free_packet(&pkt_t);  
+				av_packet_unref(&pkt_t);  
 			}  
 		} 
  
@@ -692,7 +710,7 @@ int ffmpeg_perform_code2(Out_stream_info * out_stream_info,int stream_type,AVFra
 		if (frameFinished)  
 		{  
 			ffmpeg_write_frame2(out_stream_info,OUT_VIDEO_ID,pkt_t);  
-			av_free_packet(&pkt_t);  
+			av_packet_unref(&pkt_t);  
 		}   
 	}  
 	ret = 1;
@@ -855,7 +873,7 @@ void ffmpeg_write_frame(Out_stream_info * out_stream_info,int ID,AVPacket pkt_t)
 	if(ID == OUT_VIDEO_ID)  
 	{  
 		AVPacket videopacket_t;  
-		av_init_packet(&videopacket_t);  
+		av_init_packet2(&videopacket_t);  
  
 		videopacket_t.pts = av_rescale_q_rnd(pkt_t.pts, m_icodec->streams[m_in_video_stream_idx]->time_base, out_stream_info->m_ovideo_st->time_base, AV_ROUND_NEAR_INF);  
 		videopacket_t.dts = av_rescale_q_rnd(pkt_t.dts, m_icodec->streams[m_in_video_stream_idx]->time_base, out_stream_info->m_ovideo_st->time_base, AV_ROUND_NEAR_INF);  
@@ -875,7 +893,7 @@ void ffmpeg_write_frame(Out_stream_info * out_stream_info,int ID,AVPacket pkt_t)
 	else if(ID == OUT_AUDIO_ID)  
 	{  
 		AVPacket audiopacket_t;  
-		av_init_packet(&audiopacket_t);  
+		av_init_packet2(&audiopacket_t);  
  
 		audiopacket_t.pts = av_rescale_q_rnd(pkt_t.pts, m_icodec->streams[m_in_audio_stream_idx]->time_base, out_stream_info->m_oaudio_st->time_base, AV_ROUND_NEAR_INF);  
 		audiopacket_t.dts = av_rescale_q_rnd(pkt_t.dts, m_icodec->streams[m_in_audio_stream_idx]->time_base, out_stream_info->m_oaudio_st->time_base, AV_ROUND_NEAR_INF);  
@@ -902,7 +920,7 @@ void ffmpeg_write_frame(Out_stream_info * out_stream_info,int ID,AVPacket pkt_t)
 						audiopacket_t.data, audiopacket_t.size, audiopacket_t.flags & AV_PKT_FLAG_KEY);   
 					if (a >  0)               
 					{                  
-						av_free_packet(&audiopacket_t);   
+						av_packet_unref(&audiopacket_t);   
 						//filteredPacket.destruct = av_destruct_packet;    
 						//filteredPacket.destruct = NULL;    
 						audiopacket_t = filteredPacket;               
@@ -915,7 +933,7 @@ void ffmpeg_write_frame(Out_stream_info * out_stream_info,int ID,AVPacket pkt_t)
 					{                  
 						fprintf(stderr, "%s failed for stream %d, codec %s",  
 							out_stream_info->m_vbsf_aac_adtstoasc->filter->name,audiopacket_t.stream_index,out_stream_info->m_oaudio_st->codec->codec ?  out_stream_info->m_oaudio_st->codec->codec->name : "copy");  
-						av_free_packet(&audiopacket_t);     
+						av_packet_unref(&audiopacket_t);     
  
 					}  
 				}  
@@ -938,7 +956,7 @@ void ffmpeg_write_frame2(Out_stream_info * out_stream_info,int ID,AVPacket pkt_t
 	if(ID == OUT_VIDEO_ID)  
 	{  
 		AVPacket videopacket_t;  
-		av_init_packet(&videopacket_t);  
+		av_init_packet2(&videopacket_t);  
  
 		videopacket_t.pts = av_rescale_q_rnd(pkt_t.pts, out_stream_info->m_ovideo_st->codec->time_base, out_stream_info->m_ovideo_st->time_base, AV_ROUND_NEAR_INF);  
 		videopacket_t.dts = av_rescale_q_rnd(pkt_t.dts, out_stream_info->m_ovideo_st->codec->time_base, out_stream_info->m_ovideo_st->time_base, AV_ROUND_NEAR_INF);  
@@ -957,7 +975,7 @@ void ffmpeg_write_frame2(Out_stream_info * out_stream_info,int ID,AVPacket pkt_t
 	else if(ID == OUT_AUDIO_ID)  
 	{  
 		AVPacket audiopacket_t;  
-		av_init_packet(&audiopacket_t);  
+		av_init_packet2(&audiopacket_t);  
  
 		audiopacket_t.pts = av_rescale_q_rnd(pkt_t.pts, out_stream_info->m_oaudio_st->codec->time_base, out_stream_info->m_oaudio_st->time_base, AV_ROUND_NEAR_INF);  
 		audiopacket_t.dts = av_rescale_q_rnd(pkt_t.dts, out_stream_info->m_oaudio_st->codec->time_base, out_stream_info->m_oaudio_st->time_base, AV_ROUND_NEAR_INF);  
@@ -983,7 +1001,7 @@ void ffmpeg_write_frame2(Out_stream_info * out_stream_info,int ID,AVPacket pkt_t
 						audiopacket_t.data, audiopacket_t.size, audiopacket_t.flags & AV_PKT_FLAG_KEY);   
 					if (a >  0)               
 					{                  
-						av_free_packet(&audiopacket_t);   
+						av_packet_unref(&audiopacket_t);   
 					//	filteredPacket.destruct = NULL;    
 						audiopacket_t = filteredPacket;               
 					}     
@@ -995,7 +1013,7 @@ void ffmpeg_write_frame2(Out_stream_info * out_stream_info,int ID,AVPacket pkt_t
 					{                  
 						fprintf(stderr, "%s failed for stream %d, codec %s",  
 							out_stream_info->m_vbsf_aac_adtstoasc->filter->name,audiopacket_t.stream_index,out_stream_info->m_oaudio_st->codec->codec ?  out_stream_info->m_oaudio_st->codec->codec->name : "copy");  
-						av_free_packet(&audiopacket_t);     
+						av_packet_unref(&audiopacket_t);     
  
 					}  
 				}  
@@ -1036,10 +1054,12 @@ int ffmpeg_transcode(int original_user_stream_id)
 				out_stream_info_all->m_pout_video_frame->height = out_stream_info_all->m_dwHeight;
 				out_stream_info_all->m_pout_video_frame->format = out_stream_info_all->m_video_pixelfromat;
  
-				int Out_size = avpicture_get_size((AVPixelFormat)out_stream_info_all->m_video_pixelfromat, out_stream_info_all->m_dwWidth,out_stream_info_all->m_dwHeight);  
+				int Out_size = av_image_get_buffer_size((AVPixelFormat)out_stream_info_all->m_video_pixelfromat, out_stream_info_all->m_dwWidth,out_stream_info_all->m_dwHeight,1);  
 				uint8_t * pOutput_buf =( uint8_t *)malloc(Out_size * 3 * sizeof(char)); //最大分配的空间，能满足yuv的各种格式  
-				avpicture_fill((AVPicture *)out_stream_info_all->m_pout_video_frame, (unsigned char *)pOutput_buf, 
-					(AVPixelFormat)out_stream_info_all->m_video_pixelfromat, out_stream_info_all->m_dwWidth,out_stream_info_all->m_dwHeight); //内存关联  
+				//avpicture_fill((AVPicture *)out_stream_info_all->m_pout_video_frame, (unsigned char *)pOutput_buf, 
+				//	(AVPixelFormat)out_stream_info_all->m_video_pixelfromat, out_stream_info_all->m_dwWidth,out_stream_info_all->m_dwHeight); //内存关联  
+				av_image_fill_arrays(out_stream_info_all->m_pout_video_frame->data,out_stream_info_all->m_pout_video_frame->linesize,(unsigned char *)pOutput_buf,
+                                         (AVPixelFormat)out_stream_info_all->m_video_pixelfromat, out_stream_info_all->m_dwWidth,out_stream_info_all->m_dwHeight,1);
  
 				av_frame_unref(out_stream_info_all->m_pout_audio_frame);  
 			}
@@ -1051,7 +1071,7 @@ int ffmpeg_transcode(int original_user_stream_id)
 	//开始解包  
 	while (1)  
 	{  
-		av_init_packet(&m_in_pkt);  
+		av_init_packet2(&m_in_pkt);  
 		if (av_read_frame(m_icodec, &m_in_pkt) < 0)  
 		{  
 			break;  

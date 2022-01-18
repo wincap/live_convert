@@ -4,8 +4,11 @@ int main(int argc ,char ** argv)
 {
 	int ret = 0;
  
-	av_register_all();
-	avformat_network_init();
+
+        #if CONFIG_AVDEVICE
+            avdevice_register_all();
+        #endif
+        avformat_network_init();
  
 	ffmpeg_init_demux(INPUTURL,&m_icodec);
  
